@@ -1,7 +1,11 @@
 from ..rfc6749.errors import InvalidScopeError
 
 
-class BearerTokenGenerator:
+class TokenGenerator:
+    TOKEN_TYPE = None
+
+
+class BearerTokenGenerator(TokenGenerator):
     """Bearer token generator which can create the payload for token response
     by OAuth 2 server. A typical token response would be:
 
@@ -20,6 +24,7 @@ class BearerTokenGenerator:
         }
     """
 
+    TOKEN_TYPE = "Bearer"
     #: default expires_in value
     DEFAULT_EXPIRES_IN = 3600
     #: default expires_in value differentiate by grant_type
@@ -98,7 +103,7 @@ class BearerTokenGenerator:
             expires_in = self._get_expires_in(client, grant_type)
 
         token = {
-            "token_type": "Bearer",
+            "token_type": self.TOKEN_TYPE,
             "access_token": access_token,
         }
         if expires_in:
