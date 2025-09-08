@@ -32,6 +32,9 @@ class ClientMetadataClaims(BaseClaims):
         "require_signed_request_object",
     ]
 
+    def __init__(self, claims=None, header=None, options=None, params=None):
+        super().__init__(claims or {}, header, options, params)
+
     def validate(self, now=None, leeway=0):
         super().validate(now, leeway)
         self.validate_require_signed_request_object()
@@ -41,3 +44,8 @@ class ClientMetadataClaims(BaseClaims):
 
         if not isinstance(self["require_signed_request_object"], bool):
             raise InvalidClaimError("require_signed_request_object")
+
+    @property
+    def require_signed_request_object(self):
+        # If omitted, the default value is false.
+        return self.get("require_signed_request_object", False)

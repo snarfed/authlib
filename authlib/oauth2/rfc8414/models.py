@@ -42,8 +42,6 @@ class AuthorizationServerMetadata(dict):
         "introspection_endpoint_auth_methods_supported",
         "introspection_endpoint_auth_signing_alg_values_supported",
         "code_challenge_methods_supported",
-        "pushed_authorization_request_endpoint",
-        "require_pushed_authorization_requests",
     ]
 
     def validate_issuer(self):
@@ -327,26 +325,6 @@ class AuthorizationServerMetadata(dict):
         does not support PKCE.
         """
         validate_array_value(self, "code_challenge_methods_supported")
-
-    def validate_pushed_authorization_request_endpoint(self):
-        """The URL of the pushed authorization request endpoint at which a
-        client can post an authorization request to exchange for a
-        request_uri value usable at the authorization server.
-        """
-        url = self.get("pushed_authorization_request_endpoint")
-        if url and not is_secure_transport(url):
-            raise ValueError('"pushed_authorization_request_endpoint" MUST use "https" scheme')
-
-        require_pushed_authorization_requests = self.require_pushed_authorization_requests
-        if require_pushed_authorization_requests and not url:
-            raise ValueError('"pushed_authorization_request_endpoint" is required')
-
-    def validate_require_pushed_authorization_requests(self):
-        """Boolean parameter indicating whether the authorization server
-        accepts authorization request data only via PAR. If omitted, the
-        default value is false.
-        """
-        _validate_boolean_value(self, "require_pushed_authorization_requests")
 
     @property
     def response_modes_supported(self):
