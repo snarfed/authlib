@@ -32,9 +32,6 @@ class NoneAlgorithm(JWSAlgorithm):
     def prepare_key(self, raw_data):
         return None
 
-    def generate_key(self, options=None, is_private=False):
-        return None
-
     def sign(self, msg, key):
         return b""
 
@@ -53,19 +50,14 @@ class HMACAlgorithm(JWSAlgorithm):
     SHA256 = hashlib.sha256
     SHA384 = hashlib.sha384
     SHA512 = hashlib.sha512
-    key_cls = OctKey
 
     def __init__(self, sha_type):
-        self.size = sha_type
         self.name = f"HS{sha_type}"
         self.description = f"HMAC using SHA-{sha_type}"
         self.hash_alg = getattr(self, f"SHA{sha_type}")
 
     def prepare_key(self, raw_data):
         return OctKey.import_key(raw_data)
-
-    def generate_key(self, options=None, is_private=False):
-        return OctKey.generate_key(self.size, options, is_private)
 
     def sign(self, msg, key):
         # it is faster than the one in cryptography
@@ -89,10 +81,8 @@ class RSAAlgorithm(JWSAlgorithm):
     SHA256 = hashes.SHA256
     SHA384 = hashes.SHA384
     SHA512 = hashes.SHA512
-    key_cls = RSAKey
 
     def __init__(self, sha_type):
-        self.size = sha_type
         self.name = f"RS{sha_type}"
         self.description = f"RSASSA-PKCS1-v1_5 using SHA-{sha_type}"
         self.hash_alg = getattr(self, f"SHA{sha_type}")
@@ -100,9 +90,6 @@ class RSAAlgorithm(JWSAlgorithm):
 
     def prepare_key(self, raw_data):
         return RSAKey.import_key(raw_data)
-
-    def generate_key(self, options=None, is_private=False):
-        return RSAKey.generate_key(self.size, options, is_private)
 
     def sign(self, msg, key):
         op_key = key.get_op_key("sign")
@@ -128,7 +115,6 @@ class ECAlgorithm(JWSAlgorithm):
     SHA256 = hashes.SHA256
     SHA384 = hashes.SHA384
     SHA512 = hashes.SHA512
-    key_cls = ECKey
 
     def __init__(self, name, curve, sha_type):
         self.name = name
@@ -143,9 +129,6 @@ class ECAlgorithm(JWSAlgorithm):
                 f'Key for "{self.name}" not supported, only "{self.curve}" allowed'
             )
         return key
-
-    def generate_key(self, options=None, is_private=False):
-        return ECKey.generate_key(self.curve, options, is_private)
 
     def sign(self, msg, key):
         op_key = key.get_op_key("sign")
@@ -184,10 +167,8 @@ class RSAPSSAlgorithm(JWSAlgorithm):
     SHA256 = hashes.SHA256
     SHA384 = hashes.SHA384
     SHA512 = hashes.SHA512
-    key_cls = RSAKey
 
     def __init__(self, sha_type):
-        self.size = sha_type
         self.name = f"PS{sha_type}"
         tpl = "RSASSA-PSS using SHA-{} and MGF1 with SHA-{}"
         self.description = tpl.format(sha_type, sha_type)
@@ -195,9 +176,6 @@ class RSAPSSAlgorithm(JWSAlgorithm):
 
     def prepare_key(self, raw_data):
         return RSAKey.import_key(raw_data)
-
-    def generate_key(self, options=None, is_private=False):
-        return RSAKey.generate_key(self.size, options, is_private)
 
     def sign(self, msg, key):
         op_key = key.get_op_key("sign")
