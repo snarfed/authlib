@@ -11,6 +11,14 @@ Version 1.8.0
 
 **Unreleased**
 
+- Add server side :ref:`specs/rfc9449` DPoP support: ``DPoPProofValidator``
+  validates proofs at the token endpoint and at protected resources,
+  ``DPoPGrantExtension`` and the ``DPoP`` server extension bind authorization
+  codes and refresh tokens to a client key, ``DPoPTokenValidator`` checks the
+  binding on resource requests, and ``HMACDPoPNonceGenerator`` issues server
+  nonces that are shared across workers. ``BearerTokenValidator`` now refuses a
+  DPoP bound access token presented as a plain Bearer token. :issue:`315`
+  :pr:`808`
 - **Breaking change**: ``authlib.integrations.httpx_client`` is now powered by
   ``httpx2`` instead of ``httpx``. Install ``httpx2`` instead of ``httpx`` to
   keep using this integration; the public import path and class names are
