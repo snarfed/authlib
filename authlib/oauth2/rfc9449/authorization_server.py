@@ -1,49 +1,50 @@
-from authlib.oauth2 import AuthorizationServer
-from authlib.oauth2 import OAuth2Request
 from authlib.oauth2.rfc6749 import AuthorizationCodeGrant
 from authlib.oauth2.rfc6749 import BaseGrant
 from authlib.oauth2.rfc6749 import ClientMixin
-from authlib.oauth2.rfc6749 import InvalidRequestError
 from authlib.oauth2.rfc6749 import RefreshTokenGrant
-from authlib.oauth2.rfc9449.grants import DPoPGrantExtension
-from authlib.oauth2.rfc9449.registration import ClientMetadataClaims
-from authlib.oauth2.rfc9449.validator import DPoPProofValidator
+
+from .grants import DPoPGrantExtension
+from .registration import ClientMetadataClaims
+from .validator import DPoPProofValidator
 
 
 class DPoP:
+    """Server extension adding DPoP support to the token endpoint.
+
+    Register it once and it applies to every Authorization Code and Refresh
+    Token grant the server knows about::
+
+        proof_validator = DPoPProofValidator(
+            nonce_generator=HMACDPoPNonceGenerator(secret)
+        )
+        server.register_extension(DPoP(proof_validator))
+
+    DPoP is optional per request by default. To require it for a given client,
+    override :meth:`get_client_metadata` to report the client's
+    ``dpop_bound_access_tokens`` value.
+    """
+
     def __init__(self, proof_validator: DPoPProofValidator):
         self.proof_validator = proof_validator
 
-    def __call__(self, server: AuthorizationServer):
-        server.register_hook("after_get_authorization_grant", self.add_dpop_extension)
-        server.register_hook("after_get_token_grant", self.add_dpop_extension_and_confirm_dpop)
+    def __call__(self, server):
+        server.register_hook("after_get_token_grant", self.add_dpop_extension)
 
-    def add_dpop_extension(self, server: AuthorizationServer, grant: BaseGrant):
-        if isinstance(grant, AuthorizationCodeGrant) or isinstance(grant, RefreshTokenGrant):
-            dpop_grant_extension = DPoPGrantExtension(self.proof_validator)
-            dpop_grant_extension(grant)
-
-    def add_dpop_extension_and_confirm_dpop(self, server: AuthorizationServer, grant: BaseGrant):
-        client = grant.authenticate_token_endpoint_client()
-        client_metadata = self.get_client_metadata(client)
-        request: OAuth2Request = grant.request
-        if client_metadata and client_metadata.dpop_bound_access_tokens and "DPoP" not in request.headers:
-            raise InvalidRequestError(
-                "Token requests for this client must use DPoP.",
-                state=request.payload.state,
-            )
-
-        self.add_dpop_extension(server, grant)
+    def add_dpop_extension(self, server, grant: BaseGrant):
+        if isinstance(grant, (AuthorizationCodeGrant, RefreshTokenGrant)):
+            DPoPGrantExtension(self.proof_validator, self.get_client_metadata)(grant)
 
     def get_client_metadata(self, client: ClientMixin) -> ClientMetadataClaims:
-        """Return the client metadata.
-        When the ``dpop_bound_access_tokens`` claim is :data:`True`,
-        the client must use DPoP for token requests.
-        If omitted, the default value is false.::
+        """Return the DPoP client metadata for ``client``.
+
+        When ``dpop_bound_access_tokens`` is :data:`True` the client MUST use
+        DPoP for token requests. It defaults to false. Developers storing the
+        claim on their client model should re-implement this::
+
             class DPoP(rfc9449.DPoP):
-                def get_client_metadata(self):
-                    return ClientMetadataClaims({
-                        "dpop_bound_access_tokens": ...,
-                    })
+                def get_client_metadata(self, client):
+                    return ClientMetadataClaims(
+                        {"dpop_bound_access_tokens": client.dpop_bound_access_tokens}
+                    )
         """
         return ClientMetadataClaims()

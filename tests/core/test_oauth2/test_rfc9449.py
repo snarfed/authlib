@@ -9,10 +9,13 @@ from joserfc import jwt
 from joserfc.jwk import ECKey
 from joserfc.jwk import OctKey
 
+from authlib.oauth2.rfc6749 import InvalidGrantError
 from authlib.oauth2.rfc6749 import OAuth2Request
 from authlib.oauth2.rfc6749 import ResourceProtector
+from authlib.oauth2.rfc6749.requests import BasicOAuth2Payload
 from authlib.oauth2.rfc6750 import BearerTokenValidator
 from authlib.oauth2.rfc6750 import InvalidTokenError
+from authlib.oauth2.rfc9449 import DPoPGrantExtension
 from authlib.oauth2.rfc9449 import DPoPProofValidator
 from authlib.oauth2.rfc9449 import DPoPTokenValidator
 from authlib.oauth2.rfc9449 import HMACDPoPNonceGenerator
@@ -341,6 +344,67 @@ def test_unbound_token_still_works_as_bearer():
     )
     assert make_protector(token).validate_request(None, request) is token
 
+
+class Grant:
+    def __init__(self, request, authorization_code=None):
+        self.request = request
+        self.hooks = {}
+        if authorization_code is not None:
+            request.authorization_code = authorization_code
+
+    def register_hook(self, name, hook):
+        self.hooks[name] = hook
+
+    def run(self):
+        self.hooks["after_validate_token_request"](self, None)
+
+
+class Code:
+    def __init__(self, dpop_jkt=None):
+        self.dpop_jkt = dpop_jkt
+
+    def get_dpop_jkt(self):
+        return self.dpop_jkt
+
+
+def make_grant(proof=None, authorization_code=None):
+    headers = {"DPoP": proof} if proof else {}
+    request = OAuth2Request("POST", TOKEN_ENDPOINT, headers=headers)
+    request.payload = BasicOAuth2Payload({})
+    return Grant(request, authorization_code)
+
+
+def test_grant_binds_jkt_from_proof(key):
+    grant = make_grant(proof=make_proof(key, "POST", TOKEN_ENDPOINT))
+    DPoPGrantExtension(DPoPProofValidator())(grant)
+    grant.run()
+    assert grant.request.payload.dpop_jkt == key.thumbprint()
+
+
+def test_grant_without_dpop_is_left_alone():
+    """A client not using DPoP must keep working once the extension is on."""
+    grant = make_grant()
+    DPoPGrantExtension(DPoPProofValidator())(grant)
+    grant.run()
+    assert grant.request.payload.dpop_jkt is None
+
+
+def test_grant_requires_proof_for_bound_code(key):
+    grant = make_grant(authorization_code=Code(dpop_jkt=key.thumbprint()))
+    DPoPGrantExtension(DPoPProofValidator())(grant)
+    with pytest.raises(InvalidGrantError):
+        grant.run()
+
+
+def test_grant_rejects_mismatched_jkt(key):
+    other = ECKey.generate_key("P-256")
+    grant = make_grant(
+        proof=make_proof(key, "POST", TOKEN_ENDPOINT),
+        authorization_code=Code(dpop_jkt=other.thumbprint()),
+    )
+    DPoPGrantExtension(DPoPProofValidator())(grant)
+    with pytest.raises(InvalidGrantError):
+        grant.run()
 
 
 @pytest.mark.parametrize(
