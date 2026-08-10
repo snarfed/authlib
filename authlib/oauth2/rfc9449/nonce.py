@@ -2,26 +2,7 @@ import time
 from threading import Lock
 from typing import Protocol
 
-from authlib.common.cache import LRUCache
 from authlib.common.security import generate_token
-
-
-class DPoPNonceCache(Protocol):
-    def __getitem__(self, origin: str) -> str:
-        """
-        Get the nonce saved for a specific origin url
-        :param origin: the url of the nonce to get
-        :return: the nonce
-        """
-        ...
-
-    def __setitem__(self, origin: str, nonce: str) -> None:
-        """
-        Set a nonce for the specific origin url
-        :param origin: the url of the nonce to set
-        :param nonce: the nonce to set
-        """
-        ...
 
 
 class DPoPNonceGenerator(Protocol):
@@ -39,22 +20,6 @@ class DPoPNonceGenerator(Protocol):
         :return: if the nonce is valid
         """
         ...
-
-
-class DefaultDPoPNonceCache(DPoPNonceCache):
-    """
-    A default implementation of a DPoPNonceCache utilizing an LRUCache
-    """
-    DEFAULT_CACHE_CAPACITY = 100
-
-    def __init__(self, capacity: int = DEFAULT_CACHE_CAPACITY):
-        self.lru_cache = LRUCache[str, str](capacity)
-
-    def __getitem__(self, origin: str) -> str:
-        return self.lru_cache.get(origin)
-
-    def __setitem__(self, origin: str, nonce: str):
-        self.lru_cache.set(origin, nonce)
 
 
 class DefaultDPoPNonceGenerator(DPoPNonceGenerator):

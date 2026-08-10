@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from authlib.deprecate import deprecate
+
 from .errors import InsecureTransportError
 
 
