@@ -40,3 +40,14 @@ class BearerTokenValidator(TokenValidator):
             )
         if self.scope_insufficient(token.get_scope(), scopes):
             raise InsufficientScopeError()
+        if self.TOKEN_TYPE == "bearer" and getattr(token, "get_dpop_jkt", None):
+            # A DPoP bound token must only be accepted with a valid proof, so
+            # presenting one as a plain Bearer token has to be refused.
+            # RFC 9449 section 7.1.
+            if token.get_dpop_jkt():
+                raise InvalidTokenError(
+                    description="The access token is DPoP bound and requires a DPoP proof.",
+                    token_type="DPoP",
+                    realm=self.realm,
+                    extra_attributes=self.extra_attributes,
+                )
