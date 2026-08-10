@@ -1,5 +1,5 @@
 from authlib.common.security import is_secure_transport
-from authlib.oauth2.rfc8414.models import _validate_boolean_value
+from authlib.oauth2.rfc8414.models import validate_boolean_value
 
 
 class AuthorizationServerMetadata(dict):
@@ -26,7 +26,7 @@ class AuthorizationServerMetadata(dict):
         accepts authorization request data only via PAR. If omitted, the
         default value is false.
         """
-        _validate_boolean_value(self, "require_pushed_authorization_requests")
+        validate_boolean_value(self, "require_pushed_authorization_requests")
 
     @property
     def require_pushed_authorization_requests(self):

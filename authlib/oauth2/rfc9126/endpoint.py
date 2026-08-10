@@ -31,7 +31,7 @@ class PushedAuthorizationEndpoint:
 
     def create_endpoint_response(self, request):
         # Must be done before `server.get_authorization_grant()` to ensure `request_uri` isn't used as part of JAR
-        if request.payload.request_uri:
+        if "request_uri" in request.payload.data:
             raise InvalidRequestError(
                 "The 'request_uri' parameter MUST NOT be present in the pushed authorization request.")
 

@@ -63,10 +63,23 @@ class RequestURIExtension:
 class RequestURIHandler(ABC):
     """Base class for the extensions resolving a ``request_uri`` parameter."""
 
-    REQUEST_URI_EXTENSION = RequestURIExtension()
-
     def __call__(self, server: AuthorizationServer):
-        server.register_extension(self.REQUEST_URI_EXTENSION)
+        self.request_uri_extension(server)
+
+    @staticmethod
+    def request_uri_extension(server: AuthorizationServer) -> RequestURIExtension:
+        """Return the :class:`RequestURIExtension` of ``server``, registering
+        it on first use.
+
+        The extension is per-server, so that handlers registered on one
+        authorization server are not visible from another one.
+        """
+        extension = getattr(server, "_request_uri_extension", None)
+        if extension is None:
+            extension = RequestURIExtension()
+            server._request_uri_extension = extension
+            server.register_extension(extension)
+        return extension
 
     def get_request_uri_data(self, request: OAuth2Request) -> Any:
         """Return the data designated by the ``request_uri`` parameter, or
@@ -125,7 +138,7 @@ class JWTAuthorizationRequest(RequestURIHandler):
     def __call__(self, authorization_server: AuthorizationServer):
         super().__call__(authorization_server)
         if self.support_request_uri:
-            self.REQUEST_URI_EXTENSION.register_handler(self)
+            self.request_uri_extension(authorization_server).register_handler(self)
         authorization_server.register_hook(
             "before_get_authorization_grant", self.parse_authorization_request
         )

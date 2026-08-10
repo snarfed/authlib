@@ -1,4 +1,4 @@
-from authlib.oauth2.rfc8414.models import _validate_boolean_value
+from authlib.oauth2.rfc8414.models import validate_boolean_value
 
 
 class ClientMetadataClaims(dict):
@@ -38,7 +38,7 @@ class ClientMetadataClaims(dict):
         an authorization request the client is allowed to use is PAR. If
         omitted, the default value is false..
         """
-        _validate_boolean_value(self, "require_pushed_authorization_requests")
+        validate_boolean_value(self, "require_pushed_authorization_requests")
 
     @property
     def require_pushed_authorization_requests(self):

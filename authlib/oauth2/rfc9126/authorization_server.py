@@ -17,7 +17,7 @@ class PushedAuthorizationRequest(RequestURIHandler):
 
     def __call__(self, server: AuthorizationServer):
         super().__call__(server)
-        self.REQUEST_URI_EXTENSION.register_handler(self)
+        self.request_uri_extension(server).register_handler(self)
         server.register_hook("after_get_authorization_grant", self.confirm_pushed_authorization_request)
 
     def get_request_uri_data(self, request: OAuth2Request) -> Optional[dict]:
@@ -34,6 +34,15 @@ class PushedAuthorizationRequest(RequestURIHandler):
 
     def confirm_pushed_authorization_request(self, server, grant):
         request = grant.request
+
+        # The pushed authorization endpoint validates the request it was handed
+        # by running it through get_authorization_grant, which fires this hook.
+        # That request is the one *creating* a request_uri, so it cannot have
+        # come from one itself, and requiring PAR of it would reject every
+        # pushed authorization request.
+        if isinstance(request.endpoint, PushedAuthorizationEndpoint):
+            return
+
         if request.source != self.REQUEST_SOURCE:
             client = _validate_client(server.query_client, request.payload.client_id)
             client_metadata = self.get_client_metadata(client)

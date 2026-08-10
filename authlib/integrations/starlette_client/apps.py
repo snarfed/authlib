@@ -30,7 +30,9 @@ class StarletteAppMixin:
         # Handle Starlette >= 0.26.0 where redirect_uri may now be a URL and not a string
         if redirect_uri and isinstance(redirect_uri, URL):
             redirect_uri = str(redirect_uri)
-        rv = await self.create_authorization_url(redirect_uri, authorize_url_params, **kwargs)
+        if authorize_url_params:
+            kwargs["authorize_url_params"] = authorize_url_params
+        rv = await self.create_authorization_url(redirect_uri, **kwargs)
         await self.save_authorize_data(request, redirect_uri=redirect_uri, **rv)
         return RedirectResponse(rv["url"], status_code=302)
 
