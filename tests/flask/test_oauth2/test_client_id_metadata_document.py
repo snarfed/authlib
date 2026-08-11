@@ -44,10 +44,13 @@ def server(server):
     return server
 
 
-def register_cimd(server, document=None, **kwargs):
+def register_cimd(server, document=None, metadata=None, **kwargs):
     class ClientIdMetadataDocument(cimd.ClientIdMetadataDocument):
         def fetch_client_id_metadata_document(self, client_id):
             return document
+
+        def get_server_metadata(self):
+            return metadata or {}
 
     server.register_extension(ClientIdMetadataDocument(**kwargs))
 
@@ -159,16 +162,105 @@ def test_invalid_client_id_url(test_client, server, document, invalid_client_id)
     assert resp["error"] == "invalid_client"
 
 
-def test_loopback_allowed_for_development(test_client, server, document):
-    """Deployments may opt in to loopback client identifiers for development."""
-    document["client_id"] = "https://127.0.0.1/metadata.json"
-    register_cimd(server, document, allow_loopback=True)
-
-    rv = test_client.get(
+def loopback_authorize(test_client, server, document, loopback_client_id, **kwargs):
+    document["client_id"] = loopback_client_id
+    register_cimd(server, document, **kwargs)
+    return test_client.get(
         add_params_to_uri(
             authorize_url,
-            {"response_type": "code", "client_id": "https://127.0.0.1/metadata.json"},
+            {"response_type": "code", "client_id": loopback_client_id},
         )
+    )
+
+
+def test_loopback_allowed_for_development(test_client, server, document):
+    """Deployments on a loopback address may opt in to loopback client identifiers."""
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://127.0.0.1/metadata.json",
+        allow_loopback=True,
+        metadata={"issuer": "http://127.0.0.1:5000"},
+    )
+    assert rv.data == b"ok"
+
+
+def test_loopback_allowed_for_localhost_server(test_client, server, document):
+    """A server whose issuer is localhost shares the loopback interface."""
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://127.0.0.1/metadata.json",
+        allow_loopback=True,
+        metadata={"issuer": "http://localhost:5000"},
+    )
+    assert rv.data == b"ok"
+
+
+def test_loopback_denied_for_public_server(test_client, server, document):
+    """A server that is not itself on loopback must not apply the exception.
+
+    Otherwise an attacker controlled client identifier could make a production
+    server issue requests against its own loopback interface.
+    """
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://127.0.0.1/metadata.json",
+        allow_loopback=True,
+        metadata={"issuer": "https://provider.test"},
+    )
+    resp = json.loads(rv.data)
+    assert resp["error"] == "invalid_client"
+
+
+def test_loopback_denied_without_server_metadata(test_client, server, document):
+    """Without an issuer to check, the exception cannot be granted."""
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://127.0.0.1/metadata.json",
+        allow_loopback=True,
+    )
+    resp = json.loads(rv.data)
+    assert resp["error"] == "invalid_client"
+
+
+def test_loopback_denied_for_other_interface(test_client, server, document):
+    """The client identifier must resolve to the same loopback interface."""
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://[::1]/metadata.json",
+        allow_loopback=True,
+        metadata={"issuer": "http://127.0.0.1:5000"},
+    )
+    resp = json.loads(rv.data)
+    assert resp["error"] == "invalid_client"
+
+
+def test_localhost_hostname_denied_by_default(test_client, server, document):
+    """The 'localhost' hostname is loopback too, even though it is not an address."""
+    rv = loopback_authorize(
+        test_client, server, document, "https://localhost/metadata.json"
+    )
+    resp = json.loads(rv.data)
+    assert resp["error"] == "invalid_client"
+
+
+def test_localhost_hostname_allowed_for_development(test_client, server, document):
+    rv = loopback_authorize(
+        test_client,
+        server,
+        document,
+        "https://localhost/metadata.json",
+        allow_loopback=True,
+        metadata={"issuer": "http://localhost:5000"},
     )
     assert rv.data == b"ok"
 
