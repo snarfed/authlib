@@ -61,8 +61,42 @@ for you:
 * Documents MAY be cached, honoring the HTTP cache headers. Error responses and
   invalid documents MUST NOT be cached.
 * Hostnames resolving to special-use IP addresses MUST NOT be fetched. Authlib
-  rejects client identifier URLs that use a literal special-use address, but
-  only your fetching code can check what a hostname resolves to.
+  rejects client identifier URLs that use ``localhost`` or a literal special-use
+  address, but only your fetching code can check what another hostname resolves
+  to.
+
+Local development
+-----------------
+
+Nothing special is needed to run an authorization server on localhost: the
+client identifier URL is fetched over the network like any other, so a client
+whose document is hosted at a public ``https`` URL works against a local server
+as-is. Loopback ``redirect_uris`` are fine too.
+
+The ``allow_loopback`` option is only for the narrower case where the *client's*
+document is itself on a loopback address::
+
+    authorization_server.register_extension(
+        ClientIdMetadataDocument(allow_loopback=True)
+    )
+
+.. warning::
+
+    This option MUST NOT be enabled in production. Granting the exception lets
+    an attacker-controlled client identifier URL make the authorization server
+    issue requests against its own loopback interface.
+
+As a safeguard, Authlib only applies the exception when the authorization server
+is itself running on a loopback address, which it reads from the ``issuer``
+returned by
+:meth:`~authlib.oauth2.cimd.ClientIdMetadataDocument.get_server_metadata`. The
+resolved client address must be on the same loopback interface, and if
+``get_server_metadata`` is not implemented the exception is never granted.
+
+Note that the specification suggests a different answer to local development:
+rather than relaxing this restriction, an authorization server can offer a
+service issuing stable public client identifier URLs that proxy to a developer's
+local metadata document.
 
 Finally, advertise the support in your server metadata::
 

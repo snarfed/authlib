@@ -107,20 +107,59 @@ class ClientIdMetadataDocument:
         """Return whether a client identifier URL host is allowed.
 
         Client ID metadata documents must not be fetched at special-use IP
-        addresses. Only literal addresses are checked here: since the document
-        is downloaded by :meth:`fetch_client_id_metadata_document`, guarding
-        against a hostname resolving to such an address is the responsibility of
-        that method.
+        addresses. Apart from ``localhost``, only literal addresses are checked
+        here: since the document is downloaded by
+        :meth:`fetch_client_id_metadata_document`, guarding against a hostname
+        resolving to such an address is the responsibility of that method.
         """
+        if hostname == "localhost":
+            return self.allow_loopback and self.check_server_loopback(None)
+
         try:
             address = ipaddress.ip_address(hostname)
         except ValueError:
             return True
 
         if address.is_loopback:
-            return self.allow_loopback
+            return self.allow_loopback and self.check_server_loopback(address)
 
         return address.is_global
+
+    def check_server_loopback(self, address) -> bool:
+        """Return whether this authorization server shares ``address`` loopback
+        interface, ``address`` being :data:`None` for the ``localhost`` host.
+
+        The loopback exception may only be applied when the authorization server
+        is itself running on a loopback address, so that an attacker controlled
+        client identifier URL cannot make a production server issue requests
+        against its own loopback interface. The server address is read from the
+        ``issuer`` returned by :meth:`get_server_metadata`.
+        """
+        issuer = self.get_server_metadata().get("issuer")
+        hostname = urlparse.urlparse(issuer).hostname if issuer else None
+        if not hostname:
+            log.warning(
+                "Refusing the loopback exception: 'get_server_metadata' returned no issuer."
+            )
+            return False
+
+        if hostname == "localhost":
+            return True
+
+        try:
+            server_address = ipaddress.ip_address(hostname)
+        except ValueError:
+            server_address = None
+
+        if server_address is None or not server_address.is_loopback:
+            log.warning(
+                "Refusing the loopback exception: this authorization server runs at %r, "
+                "which is not a loopback address.",
+                issuer,
+            )
+            return False
+
+        return address is None or address == server_address
 
     def fetch_client_id_metadata_document(self, client_id: str) -> dict | None:
         """Download the client ID metadata document at ``client_id``.
@@ -145,3 +184,17 @@ class ClientIdMetadataDocument:
         honored. Error responses and invalid documents must never be cached.
         """
         raise NotImplementedError()
+
+    def get_server_metadata(self) -> dict:
+        """Return this authorization server metadata.
+
+        Only the ``issuer`` is used, to check whether this server runs on a
+        loopback address when ``allow_loopback`` is enabled::
+
+            class ClientIdMetadataDocument(cimd.ClientIdMetadataDocument):
+                def get_server_metadata(self):
+                    return {"issuer": ...}
+
+        If not implemented, the loopback exception is never granted.
+        """
+        return {}
