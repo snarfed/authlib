@@ -1,4 +1,5 @@
 from authlib.common.urls import add_params_to_uri
+from authlib.common.urls import urlparse
 from authlib.deprecate import deprecate
 from authlib.oauth2.rfc6749.grants import BaseGrant
 
@@ -28,8 +29,12 @@ class IssuerParameter:
             # an authorization server supporting this specification MUST indicate
             # its identity by including the iss parameter in the response.
 
+            # redirect URIs must not have a fragment, per RFC 6749 §3.1.2, so
+            # if the location has one, it's the authorization response itself,
+            # and iss belongs next to the rest of its parameters.
+            fragment = bool(urlparse.urlparse(response.location).fragment)
             new_location = add_params_to_uri(
-                response.location, {"iss": self.get_issuer()}
+                response.location, {"iss": self.get_issuer()}, fragment
             )
             response.location = new_location
 
