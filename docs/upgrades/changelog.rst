@@ -61,6 +61,10 @@ Version 1.8.0
   to ``authlib.oauth2.rfc6749.util``.
 - The RFC 9207 ``iss`` parameter is returned in the same place as the rest of
   the authorization response, instead of always in the query string.
+- Authorization endpoint error responses follow the requested ``response_mode``
+  too, so a client asking for ``fragment`` sees errors as well as codes.
+  ``DEFAULT_RESPONSE_MODE`` and the new ``response_mode`` property are on
+  ``AuthorizationEndpointMixin``.
 
 Version 1.7.2
 -------------

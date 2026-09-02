@@ -110,6 +110,15 @@ class AuthorizationEndpointMixin:
     RESPONSE_TYPES = set()
     ERROR_RESPONSE_FRAGMENT = False
 
+    #: "response_mode" to use when the client doesn't request one
+    DEFAULT_RESPONSE_MODE = "query"
+
+    @property
+    def response_mode(self):
+        return self.request.payload.data.get(
+            "response_mode", self.DEFAULT_RESPONSE_MODE
+        )
+
     @classmethod
     def check_authorization_endpoint(cls, request: OAuth2Request):
         return request.payload.response_type in cls.RESPONSE_TYPES

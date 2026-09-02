@@ -100,3 +100,19 @@ def test_rfc9207_response_mode_fragment(test_client, server):
     params = dict(url_decode(location.fragment))
     assert params.keys() == {"code", "state", "iss"}
     assert params["iss"] == "https://auth.test"
+
+
+def test_rfc9207_response_mode_fragment_error(test_client, server):
+    """Check that the ``iss`` parameter follows the response mode for error
+    responses too."""
+
+    server.register_extension(IssuerParameter())
+    url = authorize_url + "&state=bar&response_mode=fragment"
+    rv = test_client.post(url)
+
+    location = urlparse.urlparse(rv.location)
+    assert not location.query
+    params = dict(url_decode(location.fragment))
+    assert params.keys() == {"error", "error_description", "state", "iss"}
+    assert params["error"] == "access_denied"
+    assert params["iss"] == "https://auth.test"
