@@ -460,3 +460,26 @@ def test_response_mode_invalid(test_client):
     resp = json.loads(rv.data)
     assert resp["error"] == "invalid_request"
     assert resp["error_description"] == "Invalid 'response_mode' value"
+
+
+def test_response_mode_fragment_access_denied(test_client):
+    uri = authorize_url + "&response_mode=fragment&state=foo"
+    rv = test_client.post(uri)
+
+    url = urlparse.urlparse(rv.location)
+    assert not url.query
+    params = dict(url_decode(url.fragment))
+    assert params["error"] == "access_denied"
+    assert params["state"] == "foo"
+
+
+def test_response_mode_fragment_invalid_scope(test_client, server):
+    server.scopes_supported = ["profile"]
+    uri = authorize_url + "&response_mode=fragment&scope=invalid&state=foo"
+    rv = test_client.post(uri, data={"user_id": "1"})
+
+    url = urlparse.urlparse(rv.location)
+    assert not url.query
+    params = dict(url_decode(url.fragment))
+    assert params["error"] == "invalid_scope"
+    assert params["state"] == "foo"

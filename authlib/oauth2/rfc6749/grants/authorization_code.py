@@ -59,9 +59,6 @@ class AuthorizationCodeGrant(BaseGrant, AuthorizationEndpointMixin, TokenEndpoin
     #: Generated "code" length
     AUTHORIZATION_CODE_LENGTH = 48
 
-    #: Default "response_mode" when the client doesn't request one
-    DEFAULT_RESPONSE_MODE = "query"
-
     RESPONSE_TYPES = {"code"}
     GRANT_TYPE = "authorization_code"
 
@@ -155,7 +152,10 @@ class AuthorizationCodeGrant(BaseGrant, AuthorizationEndpointMixin, TokenEndpoin
         :returns: (status_code, body, headers)
         """
         if not grant_user:
-            raise AccessDeniedError(redirect_uri=redirect_uri)
+            raise AccessDeniedError(
+                redirect_uri=redirect_uri,
+                redirect_fragment=self.response_mode == "fragment",
+            )
 
         self.request.user = grant_user
 
@@ -165,10 +165,7 @@ class AuthorizationCodeGrant(BaseGrant, AuthorizationEndpointMixin, TokenEndpoin
         params = [("code", code)]
         if self.request.payload.state:
             params.append(("state", self.request.payload.state))
-        response_mode = self.request.payload.data.get(
-            "response_mode", self.DEFAULT_RESPONSE_MODE
-        )
-        return create_response_mode_response(redirect_uri, params, response_mode)
+        return create_response_mode_response(redirect_uri, params, self.response_mode)
 
     @hooked
     def validate_token_request(self):
@@ -384,6 +381,7 @@ def validate_code_authorization_request(grant):
         raise UnauthorizedClientError(
             f"The client is not authorized to use 'response_type={response_type}'",
             redirect_uri=redirect_uri,
+            redirect_fragment=grant.response_mode == "fragment",
         )
 
     grant.request.client = client
@@ -400,5 +398,6 @@ def validate_code_authorization_request(grant):
         validate_authorization_request_payload(grant, redirect_uri)
     except OAuth2Error as error:
         error.redirect_uri = redirect_uri
+        error.redirect_fragment = grant.response_mode == "fragment"
         raise error
     return redirect_uri
