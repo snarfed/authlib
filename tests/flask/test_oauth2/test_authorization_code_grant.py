@@ -430,3 +430,33 @@ def test_missing_scope_rejected(test_client, client, monkeypatch):
 
     rv = test_client.post(authorize_url, data={"user_id": "1"})
     assert "error=invalid_scope" in rv.location
+
+
+def test_response_mode_query(test_client):
+    uri = authorize_url + "&response_mode=query&state=foo"
+    rv = test_client.post(uri, data={"user_id": "1"})
+
+    url = urlparse.urlparse(rv.location)
+    assert not url.fragment
+    params = dict(url_decode(url.query))
+    assert params.keys() == {"code", "state"}
+    assert params["state"] == "foo"
+
+
+def test_response_mode_fragment(test_client):
+    uri = authorize_url + "&response_mode=fragment&state=foo"
+    rv = test_client.post(uri, data={"user_id": "1"})
+
+    url = urlparse.urlparse(rv.location)
+    assert not url.query
+    params = dict(url_decode(url.fragment))
+    assert params.keys() == {"code", "state"}
+    assert params["state"] == "foo"
+
+
+def test_response_mode_invalid(test_client):
+    uri = authorize_url + "&response_mode=invalid&state=foo"
+    rv = test_client.post(uri, data={"user_id": "1"})
+    resp = json.loads(rv.data)
+    assert resp["error"] == "invalid_request"
+    assert resp["error_description"] == "Invalid 'response_mode' value"

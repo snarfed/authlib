@@ -1,7 +1,6 @@
 import logging
 
 from authlib.common.security import generate_token
-from authlib.common.urls import add_params_to_uri
 
 from ..errors import AccessDeniedError
 from ..errors import InvalidClientError
@@ -11,6 +10,7 @@ from ..errors import InvalidScopeError
 from ..errors import OAuth2Error
 from ..errors import UnauthorizedClientError
 from ..hooks import hooked
+from ..util import create_response_mode_response
 from .base import AuthorizationEndpointMixin
 from .base import BaseGrant
 from .base import TokenEndpointMixin
@@ -58,6 +58,9 @@ class AuthorizationCodeGrant(BaseGrant, AuthorizationEndpointMixin, TokenEndpoin
 
     #: Generated "code" length
     AUTHORIZATION_CODE_LENGTH = 48
+
+    #: Default "response_mode" when the client doesn't request one
+    DEFAULT_RESPONSE_MODE = "query"
 
     RESPONSE_TYPES = {"code"}
     GRANT_TYPE = "authorization_code"
@@ -162,9 +165,10 @@ class AuthorizationCodeGrant(BaseGrant, AuthorizationEndpointMixin, TokenEndpoin
         params = [("code", code)]
         if self.request.payload.state:
             params.append(("state", self.request.payload.state))
-        uri = add_params_to_uri(redirect_uri, params)
-        headers = [("Location", uri)]
-        return 302, "", headers
+        response_mode = self.request.payload.data.get(
+            "response_mode", self.DEFAULT_RESPONSE_MODE
+        )
+        return create_response_mode_response(redirect_uri, params, response_mode)
 
     @hooked
     def validate_token_request(self):

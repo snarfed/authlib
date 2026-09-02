@@ -45,6 +45,12 @@ Version 1.8.0
   ``invalid_client`` or ``invalid_grant`` error instead of raising an unhandled
   exception. ``JWTBearerGrant.resolve_issuer_client()`` may return ``None`` for
   an unknown issuer.
+- Honor the ``response_mode`` request parameter in ``AuthorizationCodeGrant``,
+  so that browser based clients can ask for the authorization code in the URL
+  fragment instead of the query string. It defaults to ``query``, as before,
+  and can be changed with ``DEFAULT_RESPONSE_MODE``.
+  ``create_response_mode_response()`` moved from ``authlib.oidc.core.grants.util``
+  to ``authlib.oauth2.rfc6749.util``.
 
 Version 1.7.2
 -------------
