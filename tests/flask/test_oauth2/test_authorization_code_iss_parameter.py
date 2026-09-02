@@ -1,5 +1,7 @@
 import pytest
 
+from authlib.common.urls import url_decode
+from authlib.common.urls import urlparse
 from authlib.oauth2.rfc6749.grants import (
     AuthorizationCodeGrant as _AuthorizationCodeGrant,
 )
@@ -83,3 +85,18 @@ def test_rfc9207_disbled_error_no_iss(test_client):
     rv = test_client.post(authorize_url)
     assert "error=access_denied" in rv.location
     assert "iss=" not in rv.location
+
+
+def test_rfc9207_response_mode_fragment(test_client, server):
+    """Check that the ``iss`` parameter is returned in the same place as the
+    rest of the authorization response."""
+
+    server.register_extension(IssuerParameter())
+    url = authorize_url + "&state=bar&response_mode=fragment"
+    rv = test_client.post(url, data={"user_id": "1"})
+
+    location = urlparse.urlparse(rv.location)
+    assert not location.query
+    params = dict(url_decode(location.fragment))
+    assert params.keys() == {"code", "state", "iss"}
+    assert params["iss"] == "https://auth.test"

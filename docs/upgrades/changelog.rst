@@ -51,6 +51,8 @@ Version 1.8.0
   and can be changed with ``DEFAULT_RESPONSE_MODE``.
   ``create_response_mode_response()`` moved from ``authlib.oidc.core.grants.util``
   to ``authlib.oauth2.rfc6749.util``.
+- The RFC 9207 ``iss`` parameter is returned in the same place as the rest of
+  the authorization response, instead of always in the query string.
 
 Version 1.7.2
 -------------
