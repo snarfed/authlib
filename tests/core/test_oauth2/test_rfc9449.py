@@ -8,6 +8,7 @@ import pytest
 from joserfc import jwt
 from joserfc.jwk import ECKey
 from joserfc.jwk import OctKey
+from joserfc.jwk import RSAKey
 
 from authlib.oauth2.rfc6749 import InvalidGrantError
 from authlib.oauth2.rfc6749 import OAuth2Request
@@ -31,6 +32,11 @@ RESOURCE = "https://rs.example/api"
 @pytest.fixture
 def key():
     return ECKey.generate_key("P-256")
+
+
+@pytest.fixture
+def rsa_key():
+    return RSAKey.generate_key(2048)
 
 
 def make_proof(key, method, url, alg="ES256", typ="dpop+jwt", jwk=None, **claims):
@@ -157,6 +163,28 @@ def test_alg_not_allowed_rejected(key):
     validator = DPoPProofValidator(algs=["ES384"])
     proof = make_proof(key, "POST", TOKEN_ENDPOINT)
     with pytest.raises(InvalidDPoPProofError, match="alg"):
+        validator.validate_proof(make_request(proof))
+
+
+def test_rsa_proof_accepted(rsa_key):
+    """An RSA key in the jwk header is larger than joserfc's default limit."""
+    validator = DPoPProofValidator(algs=["RS256"])
+    proof = make_proof(rsa_key, "POST", TOKEN_ENDPOINT, alg="RS256")
+    assert validator.validate_proof(make_request(proof)) == rsa_key.thumbprint()
+
+
+def test_rsa_proof_with_alg_not_allowed_reports_alg(rsa_key):
+    """Naming the alg, not the size, is what tells the client what to fix."""
+    validator = DPoPProofValidator()
+    proof = make_proof(rsa_key, "POST", TOKEN_ENDPOINT, alg="RS256")
+    with pytest.raises(InvalidDPoPProofError, match="alg"):
+        validator.validate_proof(make_request(proof))
+
+
+def test_oversized_header_rejected(key):
+    validator = DPoPProofValidator(max_header_length=64)
+    proof = make_proof(key, "POST", TOKEN_ENDPOINT)
+    with pytest.raises(InvalidDPoPProofError, match="well-formed"):
         validator.validate_proof(make_request(proof))
 
 
