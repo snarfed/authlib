@@ -17,6 +17,7 @@ from joserfc import jws
 from joserfc import jwt
 from joserfc.errors import JoseError
 from joserfc.jwk import import_key
+from joserfc.jws import JWSRegistry
 
 from authlib.oauth2.rfc6749 import OAuth2Request
 from authlib.oauth2.rfc6750 import BearerTokenValidator
@@ -118,12 +119,20 @@ class DPoPProofValidator:
         time. Ignored when a ``nonce_generator`` is configured, since the nonce
         already bounds the proof's age.
     :param replay_cache: records ``jti`` values to reject replayed proofs.
+    :param max_header_length: the largest encoded JOSE header, in bytes, that a
+        proof may carry. This is a denial of service guard; which algorithms are
+        acceptable is ``algs``'s decision alone.
 
     .. _`Section 4.3`: https://datatracker.ietf.org/doc/html/rfc9449#section-4.3
     """
 
     DEFAULT_SUPPORTED_ALGS = ["ES256"]
     DEFAULT_IAT_LEEWAY = 60
+    #: A proof carries its whole public key in the ``jwk`` header, so the header
+    #: is as big as the key. This fits RSA 2048, which joserfc's own 512 byte
+    #: default does not, so that an RSA proof is rejected for its ``alg`` rather
+    #: than as malformed.
+    DEFAULT_MAX_HEADER_LENGTH = 1024
 
     def __init__(
         self,
@@ -131,6 +140,7 @@ class DPoPProofValidator:
         algs: list[str] = None,
         iat_leeway: int = DEFAULT_IAT_LEEWAY,
         replay_cache: DPoPReplayCache = None,
+        max_header_length: int = DEFAULT_MAX_HEADER_LENGTH,
     ):
         self.nonce_generator = nonce_generator
         self.algs = list(algs or self.DEFAULT_SUPPORTED_ALGS)
@@ -138,6 +148,13 @@ class DPoPProofValidator:
         self.replay_cache = (
             replay_cache if replay_cache is not None else MemoryDPoPReplayCache()
         )
+        self.max_header_length = max_header_length
+
+    def registry(self, algorithms: list[str] = None) -> JWSRegistry:
+        """Return a joserfc registry with this validator's header size limit."""
+        registry = JWSRegistry(algorithms=algorithms)
+        registry.max_header_length = self.max_header_length
+        return registry
 
     def validate_proof(
         self,
@@ -183,7 +200,9 @@ class DPoPProofValidator:
         # The JWT signature verifies with the public key contained in the jwk
         # JOSE Header Parameter.
         try:
-            token = jwt.decode(proof, key, algorithms=[header["alg"]])
+            # the registry carries the allowed algs, since joserfc ignores
+            # algorithms= whenever one is passed
+            token = jwt.decode(proof, key, registry=self.registry([header["alg"]]))
         except (JoseError, ValueError) as error:
             raise InvalidDPoPProofError(
                 f"DPoP proof is invalid: {error}",
@@ -202,7 +221,9 @@ class DPoPProofValidator:
     def extract_header(self, proof, for_resource: bool = False) -> dict:
         """Return the proof's JOSE header without verifying its signature."""
         try:
-            return jws.extract_compact(proof.encode()).protected
+            return jws.extract_compact(
+                proof.encode(), registry=self.registry()
+            ).protected
         except (JoseError, ValueError, AttributeError) as error:
             raise InvalidDPoPProofError(
                 "DPoP proof is not a well-formed JWT",
